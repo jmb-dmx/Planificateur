@@ -1,0 +1,10 @@
+node_modules/
+*.log
+config.json
+stickers.json
+tasks.json
+shopping.json
+meals.json
+members.json
+notes.json
+external_events.json
