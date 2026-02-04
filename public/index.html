@@ -14,7 +14,8 @@
             --border: #E2E8F0; --primary: #0EA5E9; --accent: #F59E0B;
             --today-bg: #F0F9FF; --today-border: #0EA5E9;
             --header-bg: #1e293b;
-            --cell-size: min(calc((100vw - 380px) / 7), calc((100vh - 220px) / 6));
+            --zoom-factor: 1;
+            --cell-size: calc(min(calc((100vw - 380px) / 7), calc((100vh - 220px) / 6)) * var(--zoom-factor));
             --font-main: 'Plus Jakarta Sans', sans-serif;
         }
         body.dark-mode {
@@ -34,16 +35,17 @@
         #importantBanner { display: none; background: var(--accent); color: #000; padding: 10px; text-align: center; font-weight: 800; font-size: 1rem; border-bottom: 2px solid rgba(0,0,0,0.1); z-index: 5; }
 
         .main-content { display: flex; flex-grow: 1; overflow: hidden; position: relative; }
-        .calendar-container { flex-grow: 1; padding: 10px; display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .calendar-container { flex-grow: 1; padding: 10px; overflow: auto; display: flex; flex-direction: column; align-items: center; }
+        .calendar-wrapper { display: flex; flex-direction: column; align-items: center; min-width: max-content; }
         .week-days-header { display: grid; grid-template-columns: repeat(7, var(--cell-size)); gap: 8px; margin-bottom: 10px; text-align: center; font-weight: 800; font-size: 0.8rem; color: var(--text-muted); }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, var(--cell-size)); grid-template-rows: repeat(6, var(--cell-size)); gap: 8px; }
 
-        .day-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; padding: 5px; cursor: pointer; position: relative; width: var(--cell-size); height: var(--cell-size); box-sizing: border-box; overflow: hidden; }
+        .day-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; padding: 5px; cursor: pointer; position: relative; width: var(--cell-size); height: var(--cell-size); box-sizing: border-box; overflow: hidden; transition: width 0.2s, height 0.2s; }
         .day-card.today { border: 3px solid var(--today-border); background: var(--today-bg); }
         .day-number { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; }
 
         .waste-icons { position: absolute; top: 5px; right: 5px; display: flex; gap: 3px; z-index: 5; }
-        .bin { font-size: 0.8rem; }
+        .bin { font-size: 1.1rem; }
         .bin-blue { color: #3b82f6; } .bin-green { color: #22c55e; } .bin-black { color: #64748b; }
 
         .events-container { position: relative; flex-grow: 1; width: 100%; display: flex; flex-direction: column; gap: 4px; }
@@ -83,6 +85,8 @@
         <button onclick="changeMonth(1)" class="nav-btn"><i class="fa-solid fa-chevron-right"></i></button>
     </div>
     <div class="header-section">
+        <button onclick="changeZoom(0.1)" class="action-btn" title="Grossir"><i class="fa-solid fa-plus"></i></button>
+        <button onclick="changeZoom(-0.1)" class="action-btn" title="Réduire"><i class="fa-solid fa-minus"></i></button>
         <div id="clock" class="clock-box">00:00</div>
         <button onclick="goToday()" class="btn-today">AUJOURD'HUI</button>
         <button onclick="togglePhotoFrame(true)" class="action-btn" title="Cadre Photo"><i class="fa-solid fa-camera"></i></button>
@@ -97,8 +101,10 @@
 
 <div class="main-content">
     <div class="calendar-container">
-        <div class="week-days-header"><div>Dim</div><div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div></div>
-        <div id="calendar" class="calendar-grid"></div>
+        <div class="calendar-wrapper">
+            <div class="week-days-header"><div>Dim</div><div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div></div>
+            <div id="calendar" class="calendar-grid"></div>
+        </div>
     </div>
 
     <div id="taskPanel">
@@ -266,14 +272,19 @@
     function getWaste(date) {
         const bins = []; const d = new Date(date); d.setHours(0,0,0,0);
         const diff = (startStr) => {
-            const start = new Date(startStr);
+            if (!startStr) return NaN;
+            const parts = startStr.split('-');
+            const start = new Date(parts[0], parts[1] - 1, parts[2]);
             start.setHours(0,0,0,0);
             return Math.round((d - start) / (1000 * 60 * 60 * 24));
         };
 
-        if (appConfig.wasteBlueStart && d.getDay() === 2 && diff(appConfig.wasteBlueStart) % 14 === 0) bins.push('blue');
-        if (appConfig.wasteGreenStart && d.getDay() === 5 && diff(appConfig.wasteGreenStart) % 14 === 0) bins.push('green');
-        if (appConfig.wasteBlackStart && d.getDay() === 1 && diff(appConfig.wasteBlackStart) % 14 === 0) bins.push('black');
+        const dBlue = diff(appConfig.wasteBlueStart);
+        if (!isNaN(dBlue) && dBlue % 14 === 0) bins.push('blue');
+        const dGreen = diff(appConfig.wasteGreenStart);
+        if (!isNaN(dGreen) && dGreen % 14 === 0) bins.push('green');
+        const dBlack = diff(appConfig.wasteBlackStart);
+        if (!isNaN(dBlack) && dBlack % 14 === 0) bins.push('black');
         return bins;
     }
 
@@ -782,6 +793,15 @@
     function closeSettings() { document.getElementById('settingsOverlay').style.display = 'none'; }
     function changeMonth(v) { currentViewDate.setMonth(currentViewDate.getMonth() + v); render(); }
     function goToday() { currentViewDate = new Date(); render(); }
+
+    let zoomLevel = parseFloat(localStorage.getItem('zoomLevel')) || 1;
+    document.documentElement.style.setProperty('--zoom-factor', zoomLevel);
+
+    function changeZoom(v) {
+        zoomLevel = Math.max(0.5, Math.min(2, zoomLevel + v));
+        document.documentElement.style.setProperty('--zoom-factor', zoomLevel);
+        localStorage.setItem('zoomLevel', zoomLevel);
+    }
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}); }, 1000);
 
     const icons = ['star', 'soccer-ball', 'broom', 'cart-shopping', 'utensils', 'car', 'cake-candles', 'pills', 'stethoscope', 'laptop', 'dog', 'plane', 'school', 'dumbbell', 'heart'];
