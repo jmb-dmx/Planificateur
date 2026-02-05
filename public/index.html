@@ -80,15 +80,13 @@
         <div id="weatherWidget" class="weather-box">🌤️ --°C</div>
     </div>
     <div class="header-section">
-        <button onclick="changeZoom(-0.1)" class="nav-btn" title="Réduire"><i class="fa-solid fa-minus"></i></button>
         <button onclick="changeMonth(-1)" class="nav-btn"><i class="fa-solid fa-chevron-left"></i></button>
         <div id="monthDisplay" class="month-display">...</div>
         <button onclick="changeMonth(1)" class="nav-btn"><i class="fa-solid fa-chevron-right"></i></button>
-        <button onclick="changeZoom(0.1)" class="nav-btn" title="Grossir"><i class="fa-solid fa-plus"></i></button>
     </div>
     <div class="header-section">
-        <button onclick="changeZoom(0.1)" class="action-btn" title="Grossir"><i class="fa-solid fa-plus"></i></button>
         <button onclick="changeZoom(-0.1)" class="action-btn" title="Réduire"><i class="fa-solid fa-minus"></i></button>
+        <button onclick="changeZoom(0.1)" class="action-btn" title="Grossir"><i class="fa-solid fa-plus"></i></button>
         <div id="clock" class="clock-box">00:00</div>
         <button onclick="goToday()" class="btn-today">AUJOURD'HUI</button>
         <button onclick="togglePhotoFrame(true)" class="action-btn" title="Cadre Photo"><i class="fa-solid fa-camera"></i></button>
@@ -594,26 +592,37 @@
         }
         let idx = 0;
         const img = document.getElementById('photoFrameImg');
+
         const update = () => {
-            if (photos.length === 0) return;
+            if (photos.length === 0 || document.getElementById('photoFrame').style.display === 'none') return;
+
+            // On commence par diminuer l'opacité pour le fondu sortant
             img.style.opacity = 0;
+
             setTimeout(() => {
                 if (photos.length === 0) return;
+                const nextImg = new Image();
                 const src = photos[idx];
-                img.src = src.includes('?') ? src + '&sig=' + Math.random() : src + '?sig=' + Math.random();
-                img.style.opacity = 1;
-                idx = (idx + 1) % photos.length;
-            }, 1000);
-        };
-        update();
-        photoInterval = setInterval(update, 10000);
+                const fullSrc = src.includes('?') ? src + '&sig=' + Math.random() : src + '?sig=' + Math.random();
 
-        // Update clock in photo frame
-        const clockUpdate = () => {
-            document.getElementById('photoFrameClock').innerText = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+                nextImg.onload = () => {
+                    img.src = fullSrc;
+                    // Une fois l'image chargée, on augmente l'opacité pour le fondu entrant
+                    img.style.opacity = 1;
+                    idx = (idx + 1) % photos.length;
+                };
+                nextImg.onerror = () => {
+                    // En cas d'erreur, on passe à la suivante
+                    idx = (idx + 1) % photos.length;
+                    update();
+                };
+                nextImg.src = fullSrc;
+            }, 1000); // On attend que le fondu sortant soit terminé
         };
-        clockUpdate();
-        // The main interval already handles global clock, but we need one for the frame if it's separate
+
+        update();
+        if (photoInterval) clearInterval(photoInterval);
+        photoInterval = setInterval(update, 12000); // 10s d'affichage + temps de transition
     }
 
     async function toggleScreen(power) {
@@ -804,7 +813,13 @@
         document.documentElement.style.setProperty('--zoom-factor', zoomLevel);
         localStorage.setItem('zoomLevel', zoomLevel);
     }
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}); }, 1000);
+    setInterval(() => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+        document.getElementById('clock').innerText = timeStr;
+        const pfClock = document.getElementById('photoFrameClock');
+        if (pfClock) pfClock.innerText = timeStr;
+    }, 1000);
 
     const icons = ['star', 'soccer-ball', 'broom', 'cart-shopping', 'utensils', 'car', 'cake-candles', 'pills', 'stethoscope', 'laptop', 'dog', 'plane', 'school', 'dumbbell', 'heart'];
     function initIcons() {
