@@ -63,7 +63,7 @@ async function syncCalendars() {
 
     for (const url of config.calendarUrls) {
         try {
-            const events = await ical.fromURL(url);
+            const events = await ical.async.fromURL(url);
             for (let k in events) {
                 if (events.hasOwnProperty(k) && events[k].type === 'VEVENT') {
                     const ev = events[k];
